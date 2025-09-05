@@ -33,7 +33,7 @@ A comprehensive dashboard plugin for TRMNL that displays glucose monitoring data
 
 ## Setup Requirements
 
-### Prerequisites
+### Prerequisiteswhy w
 1. **TRMNL device** with plugin support
 2. **Data webhook** that provides the required data format
 3. **Internet connection** for live data updates

@@ -1,0 +1,39 @@
+# This is a GitHub Action workflow file.
+# It automatically creates a new release with a correctly packaged .zip file
+# every time you push a new commit to your 'main' branch.
+
+name: Create Release on Commit
+
+# This action runs on every push to the 'main' branch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # This permission is required for the action to create a release
+
+    steps:
+      # Step 1: Check out the repository's code so the action can access your files
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Create the zip file containing only the necessary plugin files.
+      # This command ensures there is no parent folder in the zip archive.
+      - name: Zip Plugin Files
+        run: zip Health-and-Transport-Dashboard.zip dashboard.liquid settings.yml README.md .gitignore plugin.json
+
+      # Step 3: Use a popular action to create the release and upload the zip asset
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # This will automatically generate release notes based on your commit messages
+          generate_release_notes: true
+          # The name of the zip file to upload as an asset
+          files: Health-and-Transport-Dashboard.zip
+          # Creates a unique tag for each release, e.g., "build-5-a1b2c3d"
+          tag_name: build-${{ github.run_number }}-${{ GITHUB.SHA_SHORT }}
