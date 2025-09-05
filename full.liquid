@@ -44,7 +44,7 @@
     <div class="dashboard-col">
       <!-- Time Display -->
       <div class="card card--time">
-        <div class="time-main">{{ current_time_adjusted | date: "%-I:%M %P" }}</div>
+        <div class="time-main">{{ current_time_adjusted | date: "%-I:%M" }}<span class="time-period">{{ current_time_adjusted | date: "%P" }}</span></div>
         <div class="time-sub">{{ current_time_adjusted | date: "%A, %B %d" }}</div>
       </div>
 
@@ -382,7 +382,7 @@
     --color-accent-light: #ffe6e6;
 
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    --font-size-large: 4rem;
+    --font-size-large: 3.5rem;
     --font-size-medium: 2.5rem;
     --font-size-small: 1.2rem;
     --font-weight-bold: 700;
@@ -430,6 +430,12 @@
     line-height: 0.9;
     white-space: nowrap;
     overflow: hidden;
+  }
+  
+  .time-period {
+    font-size: 0.6em;
+    margin-left: 0.2em;
+    font-weight: var(--font-weight-medium);
   }
   
   .time-sub {
@@ -616,6 +622,16 @@
     .dashboard-grid {
       grid-template-columns: 1fr;
       gap: 8px;
+    }
+    
+    .time-main {
+      font-size: 3rem;
+    }
+  }
+  
+  @media (max-width: 400px) {
+    .time-main {
+      font-size: 2.5rem;
     }
   }
   

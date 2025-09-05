@@ -27,7 +27,12 @@ jobs:
       - name: Zip Plugin Files
         run: zip Health-and-Transport-Dashboard.zip full.liquid settings.yml README.md .gitignore plugin.json
 
-      # Step 3: Use a popular action to create the release and upload the zip asset
+      # Step 3: Generate short SHA for tag
+      - name: Generate Short SHA
+        id: short-sha
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Step 4: Use a popular action to create the release and upload the zip asset
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -36,4 +41,4 @@ jobs:
           # The name of the zip file to upload as an asset
           files: Health-and-Transport-Dashboard.zip
           # Creates a unique tag for each release, e.g., "build-5-a1b2c3d"
-          tag_name: build-${{ github.run_number }}-${{ GITHUB.SHA_SHORT }}
+          tag_name: build-${{ github.run_number }}-${{ steps.short-sha.outputs.short_sha }}
