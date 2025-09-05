@@ -4,56 +4,41 @@ no_screen_padding: 'no'
 dark_mode: 'no'
 static_data: ''
 polling_verb: get
-polling_url: https://{{HOST}}/pebble?token={{TOKEN}}&count={{POINTS}}
+polling_url: {{WEBHOOK_URL}}
 polling_headers: ''
 polling_body: ''
-id: 149381
+id: 139518
 custom_fields:
 - keyname: __
   field_type: description
-  name: Usage instructions
-  description: 'You need to have <a href="https://nightscout.github.io/" class="underline">Nightscout-compatible</a> server.<br/> If you don''t know what it is -- just install <a href="https://gluroo.com/" class="underline">Gluroo</a> app on your phone,<br/> and go to <strong class="bg-blue-100">Menu -&gt; Devices -&gt; OTHER tab</strong> to find your Nightscout URL and API secret.
+  name: Setup Instructions
+  description: 'You need to set up a data webhook that provides glucose readings, weather data, and transport information. <br/>The webhook should return data in the format specified in the plugin documentation.<br/><br/><strong>Required data format:</strong> JSON with merge_variables containing glucose, weather, and transport data.'
 
-    '
 - keyname: ___
   field_type: description
   name: WARNING DO NOT USE THIS PLUGIN FOR MEDICATION DECISIONS
-  description: '<b>Follow medical advise from medical specialists.</b><br/> While you can see graph from the device here, it may be <b class="text-blue-400">outdated</b>, sometimes by an hour or more; the plugin graph is mere convenience, but <b>NOT</b> for decisions.<br /> <b class="text-red-400">If you feel bad, contact 112 or 911 or whatever your emergency number is!</b>
+  description: '<b>Follow medical advise from medical specialists.</b><br/> While you can see glucose data here, it may be <b class="text-blue-400">outdated</b>, sometimes by an hour or more; this display is for convenience, but <b>NOT</b> for medical decisions.<br /> <b class="text-red-400">If you feel bad, contact 112 or 911 or whatever your emergency number is!</b>
 
     '
-- keyname: USER
+- keyname: WEBHOOK_URL
+  name: Data Webhook URL
   field_type: string
-  name: Name of the user
-  placeholder: Mr. Ich Bin
-- keyname: HOST
-  field_type: string
-  name: Nightscout api host
-  placeholder: xxxx.ns.gluroo.com
-- keyname: TOKEN
-  field_type: string
-  name: Auth token
-  placeholder: very-long-token-as-given-by-the-app
-- keyname: POINTS
-  field_type: select
-  name: History length
-  options:
-  - 3 hours: 36
-  - 6 hours: 72
-  - 12 hours: 144
-  - 24 hours: 288
-- keyname: UNITS
-  field_type: select
-  name: Display units
-  options:
-  - mmol
-  - mg/dL
-  default: mmol
-- keyname: TIMESTAMP
-  field_type: select
-  name: Absolute or relative timestamps
-  options:
-  - absolute
-  - relative
-  default: absolute
-name: Nightscout Glucose Trend
-refresh_interval: 10
+  placeholder: https://your-webhook-url.com/endpoint
+  description: Your webhook URL that provides glucose, weather, and transport data
+- keyname: stop_name
+  name: Transport Stop Name
+  field_type: text
+  default_value: Central Station
+  description: Display name for the transport location
+- keyname: glucose_alert_high
+  name: High Glucose Alert (mmol/L)
+  field_type: number
+  default_value: '10.0'
+  description: Glucose level to highlight in red
+- keyname: glucose_alert_low
+  name: Low Glucose Alert (mmol/L)
+  field_type: number
+  default_value: '4.0'
+  description: Glucose level to highlight in red
+name: Health & Transport Dashboard
+refresh_interval: 5

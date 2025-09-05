@@ -4,9 +4,7 @@
 
 {% liquid
   # --- Liquid Logic ---
-  assign current_time_s = "now" | date: "%s"
-  assign utc_offset = trmnl.user.utc_offset | default: 0
-  assign current_time_adjusted = current_time_s | plus: utc_offset
+  assign current_time_adjusted = "now" | date: "%s"
 
   # Glucose Status Flags
   assign glucose_needs_attention = false
@@ -24,17 +22,18 @@
 
   # Enhanced Glucose Trend Arrows
   assign trend_symbol = "•"
-  case merge_variables.glucose.trend
-    when "rising_fast" then assign trend_symbol = "⇈"
-    when "rising" then assign trend_symbol = "↗"
-    when "rising_slowly" then assign trend_symbol = "↑"
-    when "stable" then assign trend_symbol = "→"
-    when "falling_slowly" then assign trend_symbol = "↓"
-    when "falling" then assign trend_symbol = "↘"
-    when "falling_fast" then assign trend_symbol = "⇊"
+  # Map glucose direction to trend symbols
+  case merge_variables.direction
+    when "DoubleUp" then assign trend_symbol = "⇈"
+    when "SingleUp" then assign trend_symbol = "↗"
+    when "FortyFiveUp" then assign trend_symbol = "↑"
+    when "Flat" then assign trend_symbol = "→"
+    when "FortyFiveDown" then assign trend_symbol = "↓"
+    when "SingleDown" then assign trend_symbol = "↘"
+    when "DoubleDown" then assign trend_symbol = "⇊"
   endcase
 
-  # Map BuildShip direction to Nightscout direction for chart (use top-level direction)
+  # Get glucose direction for chart
   assign chart_direction = merge_variables.direction | default: "Flat"
   assign chart_id = "glucose-bg-chart"
 %}
@@ -81,7 +80,7 @@
             <div class="glucose-icon {% if glucose_accent_color %}glucose-icon--alert{% endif %}" aria-hidden="true">{{ trend_symbol }}</div>
           </div>
           <div class="data-details">
-            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ merge_variables.glucose.value }}</div>
+            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ merge_variables.sgv }} mmol/L</div>
             <div class="glucose-sub {% if glucose_accent_color %}text--accent{% endif %}">{{ glucose_status_text }}</div>
             <div class="glucose-meta">Updated: {{ merge_variables.glucose.timestamp | date: "%-I:%M %P" }}
               {% comment %}Delta not available in current data structure{% endcomment %}
@@ -136,7 +135,7 @@
         {% endif %}
       </div>
 
-      <!-- Service Status -->
+      <!-- Service Status (optional - only show if provided) -->
       {% if merge_variables.transport.service_status %}
         {% assign is_service_alert = false %}
         {% if merge_variables.transport.service_status contains 'delay' or merge_variables.transport.service_status contains 'cancel' %}
@@ -152,57 +151,61 @@
 
 <!-- Glucose Background Chart Script -->
 <script>
+  // Make webhook data available to chart script
+  window.merge_variables = {{ merge_variables | json }};
+  
   var createGlucoseBackgroundChart = function() {
     // Only proceed if we have glucose data
-    if (!window.merge_variables || !window.merge_variables.glucose) {
+    if (!window.merge_variables || !window.merge_variables.sgv) {
+      console.log("No glucose data available for chart");
       return;
     }
     
-    const glucose = window.merge_variables.glucose;
+    // Use top-level glucose properties from webhook
+    const glucoseValue = parseFloat(window.merge_variables.sgv);
+    const glucoseTime = new Date(window.merge_variables.datetime).getTime();
+    const direction = window.merge_variables.direction || "Flat";
     
     // Convert glucose data to chart format
-    const currentTime = Date.now();
-    const bgs = [];
+    const glucoseData = [];
     
-    // Create a simple trend line using current reading
-    // If we have historical data, we could use that instead
-    if (glucose.sgv && glucose.datetime) {
-      const glucoseTime = new Date(glucose.datetime).getTime();
+    // Create 3 data points for a simple trend visualization
+    for (let i = 2; i >= 0; i--) {
+      const timeOffset = i * 30 * 60 * 1000; // 30 minutes apart
+      const time = glucoseTime - timeOffset;
       
-      // Create 3 data points for a simple trend
-      for (let i = 2; i >= 0; i--) {
-        const timeOffset = i * 30 * 60 * 1000; // 30 minutes apart
-        const time = glucoseTime - timeOffset;
-        
-        // Simple trend simulation based on direction
-        let trendValue = parseFloat(glucose.sgv);
-        if (glucose.direction === "SingleUp" || glucose.direction === "DoubleUp") {
-          trendValue = trendValue - (i * 0.5); // was rising
-        } else if (glucose.direction === "SingleDown" || glucose.direction === "DoubleDown") {
-          trendValue = trendValue + (i * 0.5); // was falling
-        }
-        
-        bgs.push({
-          datetime: time,
-          sgv: Math.max(trendValue, 2.0) // minimum reasonable value
-        });
+      // Simple trend simulation based on direction
+      let trendValue = glucoseValue;
+      if (direction === "SingleUp" || direction === "DoubleUp") {
+        trendValue = trendValue - (i * 0.8); // was rising
+      } else if (direction === "SingleDown" || direction === "DoubleDown") {
+        trendValue = trendValue + (i * 0.8); // was falling
+      } else if (direction === "FortyFiveUp") {
+        trendValue = trendValue - (i * 0.4); // gentle rise
+      } else if (direction === "FortyFiveDown") {
+        trendValue = trendValue + (i * 0.4); // gentle fall
       }
+      
+      glucoseData.push({
+        datetime: time,
+        value: Math.max(trendValue, 2.0) // minimum reasonable value
+      });
     }
 
-    if (bgs.length === 0) {
+    if (glucoseData.length === 0) {
       return; // No data to chart
     }
 
-    // Chart setup for mmol/L (assuming your glucose values are in mmol/L)
-    const setup = {
-      lines: [4.0, 7.8, 10.0], // low, target, high thresholds
+    // Chart setup for mmol/L
+    const chartConfig = {
+      thresholds: [4.0, 7.8, 10.0], // low, target, high thresholds
       unit: "mmol/L",
-      cvt: (x) => x ? (Math.round(x * 10) / 10) : x,
+      formatValue: (x) => x ? (Math.round(x * 10) / 10) : x,
     };
 
-    const data = bgs.map((x) => [x.datetime, setup.cvt(x.sgv)]);
-    const minVal = setup.cvt(Math.min(...bgs.map(x => x.sgv)));
-    const minBorder = (!minVal || setup.lines[0] < minVal) ? setup.lines[0] : minVal;
+    const data = glucoseData.map((x) => [x.datetime, chartConfig.formatValue(x.value)]);
+    const minVal = chartConfig.formatValue(Math.min(...glucoseData.map(x => x.value)));
+    const minBorder = (!minVal || chartConfig.thresholds[0] < minVal) ? chartConfig.thresholds[0] : minVal;
 
     // Create background chart with minimal styling
     new Chartkick.LineChart("{{chart_id}}", data, {
@@ -241,7 +244,7 @@
           },
           min: minBorder,
           softMin: minBorder,
-          softMax: setup.lines[2],
+          softMax: chartConfig.thresholds[2],
           startOnTick: false,
           plotLines: [], // Remove threshold lines for cleaner background
           gridLineWidth: 0,
