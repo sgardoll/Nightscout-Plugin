@@ -1,0 +1,59 @@
+---
+strategy: polling
+no_screen_padding: 'no'
+dark_mode: 'no'
+static_data: ''
+polling_verb: get
+polling_url: https://{{HOST}}/pebble?token={{TOKEN}}&count={{POINTS}}
+polling_headers: ''
+polling_body: ''
+id: 149381
+custom_fields:
+- keyname: __
+  field_type: description
+  name: Usage instructions
+  description: 'You need to have <a href="https://nightscout.github.io/" class="underline">Nightscout-compatible</a> server.<br/> If you don''t know what it is -- just install <a href="https://gluroo.com/" class="underline">Gluroo</a> app on your phone,<br/> and go to <strong class="bg-blue-100">Menu -&gt; Devices -&gt; OTHER tab</strong> to find your Nightscout URL and API secret.
+
+    '
+- keyname: ___
+  field_type: description
+  name: WARNING DO NOT USE THIS PLUGIN FOR MEDICATION DECISIONS
+  description: '<b>Follow medical advise from medical specialists.</b><br/> While you can see graph from the device here, it may be <b class="text-blue-400">outdated</b>, sometimes by an hour or more; the plugin graph is mere convenience, but <b>NOT</b> for decisions.<br /> <b class="text-red-400">If you feel bad, contact 112 or 911 or whatever your emergency number is!</b>
+
+    '
+- keyname: USER
+  field_type: string
+  name: Name of the user
+  placeholder: Mr. Ich Bin
+- keyname: HOST
+  field_type: string
+  name: Nightscout api host
+  placeholder: xxxx.ns.gluroo.com
+- keyname: TOKEN
+  field_type: string
+  name: Auth token
+  placeholder: very-long-token-as-given-by-the-app
+- keyname: POINTS
+  field_type: select
+  name: History length
+  options:
+  - 3 hours: 36
+  - 6 hours: 72
+  - 12 hours: 144
+  - 24 hours: 288
+- keyname: UNITS
+  field_type: select
+  name: Display units
+  options:
+  - mmol
+  - mg/dL
+  default: mmol
+- keyname: TIMESTAMP
+  field_type: select
+  name: Absolute or relative timestamps
+  options:
+  - absolute
+  - relative
+  default: absolute
+name: Nightscout Glucose Trend
+refresh_interval: 10
