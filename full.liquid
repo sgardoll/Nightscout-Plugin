@@ -6,15 +6,33 @@
   # --- Liquid Logic ---
   assign current_time_adjusted = "now" | date: "%s"
 
+  # Safe data access with defaults
+  assign safe_sgv = merge_variables.sgv | default: "0.0"
+  assign safe_direction = merge_variables.direction | default: "Flat"
+  assign safe_glucose_status = merge_variables.glucose.status | default: "normal"
+  assign safe_glucose_timestamp = merge_variables.glucose.timestamp | default: merge_variables.datetime
+  assign safe_weather_temp = merge_variables.weather.temperature.current | default: 0
+  assign safe_weather_feels = merge_variables.weather.temperature.feels_like | default: 0
+  assign safe_weather_desc = merge_variables.weather.condition.description | default: "Unknown"
+  assign safe_weather_humidity = merge_variables.weather.humidity | default: 0
+  assign safe_transport_location = merge_variables.transport.location | default: "Unknown Location"
+  
+  # Debug: Store raw values for troubleshooting
+  assign debug_sgv = merge_variables.sgv
+  assign debug_direction = merge_variables.direction
+  assign debug_glucose_status = merge_variables.glucose.status
+  assign debug_weather_desc = merge_variables.weather.condition.description
+  assign debug_departures_size = merge_variables.transport.departures.size
+
   # Glucose Status Flags
   assign glucose_needs_attention = false
   assign glucose_accent_color = false
   assign glucose_status_text = "Stable"
-  case merge_variables.glucose.status
+  case safe_glucose_status
     when "low", "high"
       assign glucose_needs_attention = true
       assign glucose_accent_color = true
-      assign glucose_status_text = merge_variables.glucose.status | capitalize
+      assign glucose_status_text = safe_glucose_status | capitalize
     when "warning"
       assign glucose_needs_attention = true
       assign glucose_status_text = "Warning"
@@ -23,7 +41,7 @@
   # Enhanced Glucose Trend Arrows
   assign trend_symbol = "•"
   # Map glucose direction to trend symbols
-  case merge_variables.direction
+  case safe_direction
     when "DoubleUp" then assign trend_symbol = "⇈"
     when "SingleUp" then assign trend_symbol = "↗"
     when "FortyFiveUp" then assign trend_symbol = "↑"
@@ -34,7 +52,7 @@
   endcase
 
   # Get glucose direction for chart
-  assign chart_direction = merge_variables.direction | default: "Flat"
+  assign chart_direction = safe_direction
   assign chart_id = "glucose-bg-chart"
 %}
 
@@ -53,7 +71,7 @@
         <div class="data-row">
           <div class="icon-container">
             <div class="weather-icon" aria-hidden="true">
-              {% assign desc = merge_variables.weather.condition.description | downcase %}
+              {% assign desc = safe_weather_desc | downcase %}
               {% if desc contains "sun" or desc contains "clear" %}☀
               {% elsif desc contains "cloud" %}☁
               {% elsif desc contains "rain" or desc contains "shower" %}🌧
@@ -62,9 +80,9 @@
             </div>
           </div>
           <div class="data-details">
-            <div class="temp-main">{{ merge_variables.weather.temperature.current | round }}°C</div>
-            <div class="temp-sub">{{ merge_variables.weather.condition.description | capitalize }}</div>
-            <div class="temp-meta">Feels {{ merge_variables.weather.temperature.feels_like | round }}° • {{ merge_variables.weather.humidity | round }}% Humidity</div>
+            <div class="temp-main">{{ safe_weather_temp | round }}°C</div>
+            <div class="temp-sub">{{ safe_weather_desc | capitalize }}</div>
+            <div class="temp-meta">Feels {{ safe_weather_feels | round }}° • {{ safe_weather_humidity | round }}% Humidity</div>
           </div>
         </div>
       </div>
@@ -80,9 +98,9 @@
             <div class="glucose-icon {% if glucose_accent_color %}glucose-icon--alert{% endif %}" aria-hidden="true">{{ trend_symbol }}</div>
           </div>
           <div class="data-details">
-            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ merge_variables.sgv }} mmol/L</div>
+            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ safe_sgv }} mmol/L</div>
             <div class="glucose-sub {% if glucose_accent_color %}text--accent{% endif %}">{{ glucose_status_text }}</div>
-            <div class="glucose-meta">Updated: {{ merge_variables.glucose.timestamp | date: "%-I:%M %P" }}
+            <div class="glucose-meta">Updated: {% if safe_glucose_timestamp != blank %}{{ safe_glucose_timestamp | date: "%-I:%M %P" }}{% else %}No data{% endif %}
               {% comment %}Delta not available in current data structure{% endcomment %}
             </div>
           </div>
@@ -95,31 +113,36 @@
       <!-- Transport Header -->
       <div class="card card--transport-header">
         <div class="transport-title">Next Departures</div>
-        <div class="transport-location">{{ merge_variables.transport.location }}</div>
+        <div class="transport-location">{{ safe_transport_location }}</div>
       </div>
 
       <!-- Departures List -->
       <div class="departures-list">
-        {% if merge_variables.transport.departures.size > 0 %}
-          {% for departure in merge_variables.transport.departures limit: 8 %}
+        {% assign departures_array = merge_variables.transport.departures | default: empty %}
+        {% if departures_array and departures_array.size > 0 %}
+          {% for departure in departures_array limit: 8 %}
+            {% assign safe_route = departure.route | default: "?" %}
+            {% assign safe_destination = departure.destination | default: "Unknown" %}
+            {% assign safe_mins_away = departure.mins_away | default: 0 %}
+            {% assign safe_delay = departure.delay | default: 0 %}
             {% assign is_imminent = false %}
-            {% if departure.mins_away <= 1 %}{% assign is_imminent = true %}{% endif %}
+            {% if safe_mins_away <= 1 %}{% assign is_imminent = true %}{% endif %}
 
             <div class="departure-item {% cycle 'bg--white', 'bg--gray-10' %}">
               <div class="departure-route">
-                <span class="route-badge {% if is_imminent %}route-badge--alert{% endif %}">{{ departure.route }}</span>
+                <span class="route-badge {% if is_imminent %}route-badge--alert{% endif %}">{{ safe_route }}</span>
               </div>
               <div class="departure-info">
-                <div class="departure-destination clamp--1">{{ departure.destination }}</div>
+                <div class="departure-destination clamp--1">{{ safe_destination }}</div>
               </div>
               <div class="departure-timing">
                 {% if is_imminent %}
                 <div class="timing-main timing-main--alert">Now</div>
                 {% else %}
-                <div class="timing-main">{{ departure.mins_away | round }}m</div>
+                <div class="timing-main">{{ safe_mins_away | round }}m</div>
                 {% endif %}
-                {% if departure.delay and departure.delay > 0 %}
-                <div class="timing-delay">+{{ departure.delay }}m</div>
+                {% if safe_delay and safe_delay > 0 %}
+                <div class="timing-delay">+{{ safe_delay }}m</div>
                 {% endif %}
               </div>
             </div>
@@ -136,16 +159,22 @@
       </div>
 
       <!-- Service Status (optional - only show if provided) -->
-      {% if merge_variables.transport.service_status %}
+      {% assign safe_service_status = merge_variables.transport.service_status | default: "" %}
+      {% if safe_service_status != blank %}
         {% assign is_service_alert = false %}
-        {% if merge_variables.transport.service_status contains 'delay' or merge_variables.transport.service_status contains 'cancel' %}
+        {% if safe_service_status contains 'delay' or safe_service_status contains 'cancel' %}
           {% assign is_service_alert = true %}
         {% endif %}
         <div class="card card--service-status {% if is_service_alert %}card--service-status-alert{% endif %}" role="status">
-          <div class="service-status-text {% if is_service_alert %}text--accent{% endif %}">{{ merge_variables.transport.service_status }}</div>
+          <div class="service-status-text {% if is_service_alert %}text--accent{% endif %}">{{ safe_service_status }}</div>
         </div>
       {% endif %}
     </div>
+  </div>
+  
+  <!-- Debug Info (small, unobtrusive) -->
+  <div style="position: fixed; bottom: 5px; right: 5px; font-size: 10px; color: #999; background: rgba(255,255,255,0.8); padding: 2px 5px; border-radius: 3px;">
+    SGV: {{ debug_sgv | default: "null" }} | DIR: {{ debug_direction | default: "null" }} | DEP: {{ debug_departures_size | default: "null" }}
   </div>
 </div>
 
@@ -154,17 +183,49 @@
   // Make webhook data available to chart script
   window.merge_variables = {{ merge_variables | json }};
   
+  // Debug: Log the data structure
+  console.log("Webhook data received:", window.merge_variables);
+  
   var createGlucoseBackgroundChart = function() {
     // Only proceed if we have glucose data
-    if (!window.merge_variables || !window.merge_variables.sgv) {
-      console.log("No glucose data available for chart");
+    if (!window.merge_variables) {
+      console.log("No webhook data available for chart");
       return;
     }
     
-    // Use top-level glucose properties from webhook
-    const glucoseValue = parseFloat(window.merge_variables.sgv);
-    const glucoseTime = new Date(window.merge_variables.datetime).getTime();
-    const direction = window.merge_variables.direction || "Flat";
+    // Safe data access with type checking
+    var sgvValue = window.merge_variables.sgv;
+    var datetimeValue = window.merge_variables.datetime || window.merge_variables.timestamp;
+    var directionValue = window.merge_variables.direction;
+    
+    // Convert to safe values with validation
+    var glucoseValue = 0;
+    var glucoseTime = new Date().getTime();
+    var direction = "Flat";
+    
+    try {
+      if (sgvValue !== null && sgvValue !== undefined) {
+        glucoseValue = parseFloat(String(sgvValue));
+        if (isNaN(glucoseValue)) glucoseValue = 0;
+      }
+      
+      if (datetimeValue) {
+        var parsedTime = new Date(String(datetimeValue)).getTime();
+        if (!isNaN(parsedTime)) glucoseTime = parsedTime;
+      }
+      
+      if (directionValue && typeof directionValue === 'string') {
+        direction = directionValue;
+      }
+    } catch (e) {
+      console.log("Error parsing glucose data:", e);
+      return;
+    }
+    
+    if (glucoseValue === 0) {
+      console.log("No valid glucose data for chart");
+      return;
+    }
     
     // Convert glucose data to chart format
     const glucoseData = [];
