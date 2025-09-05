@@ -42,6 +42,8 @@ A comprehensive dashboard plugin for TRMNL that displays glucose monitoring data
 
 Your webhook must return JSON data in this exact format:
 
+**Quick Start:** You can remix this BuildShip workflow template: https://buildship.vip/remix/59aca8c8-748c-4ed4-8caf-37e0665f5175
+
 ```json
 {
   "merge_variables": {
