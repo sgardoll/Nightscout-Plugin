@@ -25,7 +25,7 @@ jobs:
       # Step 2: Create the zip file containing only the necessary plugin files.
       # This command ensures there is no parent folder in the zip archive.
       - name: Zip Plugin Files
-        run: zip Health-and-Transport-Dashboard.zip dashboard.liquid settings.yml README.md .gitignore plugin.json
+        run: zip Health-and-Transport-Dashboard.zip full.liquid settings.yml README.md .gitignore plugin.json
 
       # Step 3: Use a popular action to create the release and upload the zip asset
       - name: Create GitHub Release

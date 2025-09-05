@@ -173,7 +173,7 @@ This plugin is for **informational purposes only** and should **NEVER** be used 
 
 ### File Structure
 ```
-├── dashboard.liquid    # Main template file
+├── full.liquid         # Main template file
 ├── settings.yml       # Plugin configuration
 └── README.md          # Documentation
 ```
