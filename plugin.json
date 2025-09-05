@@ -1,0 +1,8 @@
+{
+  "id": "sgardoll-health-transport-dashboard",
+  "name": "Health & Transport Dashboard",
+  "version": "1.0.0",
+  "author": "sgardoll",
+  "description": "A comprehensive dashboard plugin for TRMNL that displays glucose monitoring data, weather information, and public transport departures.",
+  "repository": "https://github.com/sgardoll/Nightscout-Plugin"
+}
