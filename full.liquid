@@ -1,5 +1,4 @@
 <!-- Chart Libraries -->
-<script src="https://cdn.jsdelivr.net/npm/chartkick@5.0.1/dist/chartkick.min.js"></script>
 <script src="https://usetrmnl.com/js/highcharts/12.3.0/highcharts.js"></script>
 
 {% liquid
@@ -269,75 +268,115 @@
     const minVal = chartConfig.formatValue(Math.min(...glucoseData.map(x => x.value)));
     const minBorder = (!minVal || chartConfig.thresholds[0] < minVal) ? chartConfig.thresholds[0] : minVal;
 
-    // Create background chart with minimal styling
-    new Chartkick.LineChart("{{chart_id}}", data, {
-      adapter: "highcharts",
-      points: false,
-      colors: ["rgba(100, 150, 255, 0.3)"], // Light blue, semi-transparent
-      curve: true,
-      library: {
+    var containerEl = document.getElementById("{{chart_id}}");
+    if (!containerEl) return;
+
+    if (window.Highcharts) {
+      Highcharts.chart(containerEl, {
         chart: {
+          type: 'line',
           height: 120,
           backgroundColor: 'transparent',
-          style: {
-            fontFamily: 'inherit'
-          }
+          style: { fontFamily: 'inherit' },
+          animation: false,
         },
-        plotOptions: {
-          series: {
-            threshold: null,
-            softThreshold: true,
-            animation: false,
-            lineWidth: 2,
-            enableMouseTracking: false, // Disable hover effects
-            states: {
-              inactive: {
-                opacity: 0.3
-              }
-            }
-          }
-        },
-        tooltip: {
-          enabled: false // Disable tooltips
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        tooltip: { enabled: false },
+        xAxis: {
+          type: 'datetime',
+          labels: { enabled: false },
+          lineWidth: 0,
+          tickWidth: 0,
+          gridLineWidth: 0,
         },
         yAxis: {
-          labels: {
-            enabled: false // Hide y-axis labels
-          },
+          title: { text: null },
+          labels: { enabled: false },
           min: minBorder,
           softMin: minBorder,
           softMax: chartConfig.thresholds[2],
           startOnTick: false,
-          plotLines: [], // Remove threshold lines for cleaner background
           gridLineWidth: 0,
           lineWidth: 0,
-          tickWidth: 0
-        },
-        xAxis: {
-          type: "datetime",
-          labels: {
-            enabled: false // Hide x-axis labels
-          },
-          lineWidth: 0,
           tickWidth: 0,
-          gridLineWidth: 0
         },
-        legend: {
-          enabled: false
+        plotOptions: {
+          series: {
+            threshold: null,
+            animation: false,
+            lineWidth: 2,
+            enableMouseTracking: false,
+            marker: { enabled: false },
+            states: { inactive: { opacity: 0.3 } }
+          }
         },
-        credits: {
-          enabled: false
-        }
-      }
-    });
+        series: [{
+          data: data,
+          color: 'rgba(100, 150, 255, 0.3)'
+        }]
+      });
+      return;
+    }
+
+    // Fallback: lightweight inline SVG line
+    // Clear container
+    containerEl.innerHTML = '';
+    var rect = containerEl.getBoundingClientRect();
+    var width = Math.max(Math.floor(rect.width), 300);
+    var height = Math.max(Math.floor(rect.height), 120);
+    var yMin = minBorder;
+    var yMax = chartConfig.thresholds[2];
+    var xMin = Math.min.apply(null, glucoseData.map(function(p){return p.datetime;}));
+    var xMax = Math.max.apply(null, glucoseData.map(function(p){return p.datetime;}));
+    if (xMax === xMin) { xMax = xMin + 1; }
+
+    var mapX = function(x){ return Math.round(((x - xMin) / (xMax - xMin)) * (width - 4)) + 2; };
+    var clamp = function(v, a, b){ return Math.min(Math.max(v, a), b); };
+    var mapY = function(y){
+      var cy = (1 - (clamp(y, yMin, yMax) - yMin) / (yMax - yMin)) * (height - 4) + 2;
+      return Math.round(cy);
+    };
+
+    var points = glucoseData.map(function(p){ return mapX(p.datetime) + "," + mapY(p.value); }).join(' ');
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', points);
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', 'rgba(60, 120, 255, 0.8)');
+    polyline.setAttribute('stroke-width', '3');
+    svg.appendChild(polyline);
+    containerEl.appendChild(svg);
   };
 
-  // Initialize chart when libraries are ready
-  if (typeof window.Chartkick !== 'undefined') {
-    createGlucoseBackgroundChart();
-  } else {
-    window.addEventListener("chartkick:load", createGlucoseBackgroundChart, true);
-  }
+  // Initialize chart when DOM is ready and container exists
+  (function initGlucoseChart() {
+    var attemptInit = function() {
+      var container = document.getElementById("{{chart_id}}");
+      if (container) {
+        createGlucoseBackgroundChart();
+        return true;
+      }
+      return false;
+    };
+
+    if (attemptInit()) return;
+
+    var attempts = 0;
+    var maxAttempts = 30; // ~4.5s at 150ms
+    var intervalId = setInterval(function() {
+      attempts += 1;
+      if (attemptInit() || attempts >= maxAttempts) {
+        clearInterval(intervalId);
+      }
+    }, 150);
+  })();
 </script>
 
 <!-- Rest of your CSS remains the same -->
@@ -389,6 +428,7 @@
     z-index: 1;
     opacity: 0.25;
     pointer-events: none; /* Prevent interaction with background chart */
+    min-height: 120px; /* ensure space for chart */
   }
 
   .glucose-with-chart .data-row {
