@@ -4,13 +4,15 @@
 
 {% liquid
   # --- Liquid Logic ---
-  assign current_time_adjusted = "now" | date: "%s"
+  assign current_time_s = "now" | date: "%s"
+  assign utc_offset = trmnl.user.utc_offset | default: 0
+  assign current_time_adjusted = current_time_s | plus: utc_offset
 
-  # Safe data access with defaults
-  assign safe_sgv = merge_variables.sgv | default: "0.0"
-  assign safe_direction = merge_variables.direction | default: "Flat"
+  # Safe data access - updated to match your actual data structure
+  assign safe_glucose_value = merge_variables.glucose.value | default: "0.0"
+  assign safe_glucose_trend = merge_variables.glucose.trend | default: "stable"
   assign safe_glucose_status = merge_variables.glucose.status | default: "normal"
-  assign safe_glucose_timestamp = merge_variables.glucose.timestamp | default: merge_variables.datetime
+  assign safe_glucose_timestamp = merge_variables.glucose.timestamp | default: "now"
   assign safe_weather_temp = merge_variables.weather.temperature.current | default: 0
   assign safe_weather_feels = merge_variables.weather.temperature.feels_like | default: 0
   assign safe_weather_desc = merge_variables.weather.condition.description | default: "Unknown"
@@ -18,8 +20,8 @@
   assign safe_transport_location = merge_variables.transport.location | default: "Unknown Location"
   
   # Debug: Store raw values for troubleshooting
-  assign debug_sgv = merge_variables.sgv
-  assign debug_direction = merge_variables.direction
+  assign debug_glucose_value = merge_variables.glucose.value
+  assign debug_glucose_trend = merge_variables.glucose.trend
   assign debug_glucose_status = merge_variables.glucose.status
   assign debug_weather_desc = merge_variables.weather.condition.description
   assign debug_departures_size = merge_variables.transport.departures.size
@@ -38,21 +40,20 @@
       assign glucose_status_text = "Warning"
   endcase
 
-  # Enhanced Glucose Trend Arrows
+  # Enhanced Glucose Trend Arrows - back to original trend names
   assign trend_symbol = "•"
-  # Map glucose direction to trend symbols
-  case safe_direction
-    when "DoubleUp" then assign trend_symbol = "⇈"
-    when "SingleUp" then assign trend_symbol = "↗"
-    when "FortyFiveUp" then assign trend_symbol = "↑"
-    when "Flat" then assign trend_symbol = "→"
-    when "FortyFiveDown" then assign trend_symbol = "↓"
-    when "SingleDown" then assign trend_symbol = "↘"
-    when "DoubleDown" then assign trend_symbol = "⇊"
+  case safe_glucose_trend
+    when "rising_fast" then assign trend_symbol = "⇈"
+    when "rising" then assign trend_symbol = "↗"
+    when "rising_slowly" then assign trend_symbol = "↑"
+    when "stable" then assign trend_symbol = "→"
+    when "falling_slowly" then assign trend_symbol = "↓"
+    when "falling" then assign trend_symbol = "↘"
+    when "falling_fast" then assign trend_symbol = "⇊"
   endcase
 
   # Get glucose direction for chart
-  assign chart_direction = safe_direction
+  assign chart_direction = safe_glucose_trend
   assign chart_id = "glucose-bg-chart"
 %}
 
@@ -98,10 +99,10 @@
             <div class="glucose-icon {% if glucose_accent_color %}glucose-icon--alert{% endif %}" aria-hidden="true">{{ trend_symbol }}</div>
           </div>
           <div class="data-details">
-            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ safe_sgv }} mmol/L</div>
+            <div class="glucose-main {% if glucose_accent_color %}text--accent{% endif %}">{{ safe_glucose_value }} mmol/L</div>
             <div class="glucose-sub {% if glucose_accent_color %}text--accent{% endif %}">{{ glucose_status_text }}</div>
-            <div class="glucose-meta">Updated: {% if safe_glucose_timestamp != blank %}{{ safe_glucose_timestamp | date: "%-I:%M %P" }}{% else %}No data{% endif %}
-              {% comment %}Delta not available in current data structure{% endcomment %}
+            <div class="glucose-meta">Updated: {% if safe_glucose_timestamp != blank %}{{ safe_glucose_timestamp | date: "%s" | plus: utc_offset | date: "%-I:%M %P" }}{% else %}No data{% endif %}
+              {% if merge_variables.glucose.delta %} • Δ {{ merge_variables.glucose.delta }}{% endif %}
             </div>
           </div>
         </div>
@@ -174,7 +175,7 @@
   
   <!-- Debug Info (small, unobtrusive) -->
   <div style="position: fixed; bottom: 5px; right: 5px; font-size: 10px; color: #999; background: rgba(255,255,255,0.8); padding: 2px 5px; border-radius: 3px;">
-    SGV: {{ debug_sgv | default: "null" }} | DIR: {{ debug_direction | default: "null" }} | DEP: {{ debug_departures_size | default: "null" }}
+    Val: {{ debug_glucose_value | default: "null" }} | Trend: {{ debug_glucose_trend | default: "null" }} | DEP: {{ debug_departures_size | default: "null" }}
   </div>
 </div>
 
@@ -188,41 +189,41 @@
   
   var createGlucoseBackgroundChart = function() {
     // Only proceed if we have glucose data
-    if (!window.merge_variables) {
-      console.log("No webhook data available for chart");
+    if (!window.merge_variables || !window.merge_variables.glucose) {
+      console.log("No glucose data available for chart");
       return;
     }
     
     // Safe data access with type checking
-    var sgvValue = window.merge_variables.sgv;
-    var datetimeValue = window.merge_variables.datetime || window.merge_variables.timestamp;
-    var directionValue = window.merge_variables.direction;
+    var glucoseValue = window.merge_variables.glucose.value;
+    var glucoseTimestamp = window.merge_variables.glucose.timestamp;
+    var glucoseTrend = window.merge_variables.glucose.trend;
     
     // Convert to safe values with validation
-    var glucoseValue = 0;
+    var glucoseNum = 0;
     var glucoseTime = new Date().getTime();
-    var direction = "Flat";
+    var trend = "stable";
     
     try {
-      if (sgvValue !== null && sgvValue !== undefined) {
-        glucoseValue = parseFloat(String(sgvValue));
-        if (isNaN(glucoseValue)) glucoseValue = 0;
+      if (glucoseValue !== null && glucoseValue !== undefined) {
+        glucoseNum = parseFloat(String(glucoseValue));
+        if (isNaN(glucoseNum)) glucoseNum = 0;
       }
       
-      if (datetimeValue) {
-        var parsedTime = new Date(String(datetimeValue)).getTime();
+      if (glucoseTimestamp) {
+        var parsedTime = new Date(String(glucoseTimestamp)).getTime();
         if (!isNaN(parsedTime)) glucoseTime = parsedTime;
       }
       
-      if (directionValue && typeof directionValue === 'string') {
-        direction = directionValue;
+      if (glucoseTrend && typeof glucoseTrend === 'string') {
+        trend = glucoseTrend;
       }
     } catch (e) {
       console.log("Error parsing glucose data:", e);
       return;
     }
     
-    if (glucoseValue === 0) {
+    if (glucoseNum === 0) {
       console.log("No valid glucose data for chart");
       return;
     }
@@ -236,14 +237,14 @@
       const time = glucoseTime - timeOffset;
       
       // Simple trend simulation based on direction
-      let trendValue = glucoseValue;
-      if (direction === "SingleUp" || direction === "DoubleUp") {
+      let trendValue = glucoseNum;
+      if (trend === "rising" || trend === "rising_fast") {
         trendValue = trendValue - (i * 0.8); // was rising
-      } else if (direction === "SingleDown" || direction === "DoubleDown") {
+      } else if (trend === "falling" || trend === "falling_fast") {
         trendValue = trendValue + (i * 0.8); // was falling
-      } else if (direction === "FortyFiveUp") {
+      } else if (trend === "rising_slowly") {
         trendValue = trendValue - (i * 0.4); // gentle rise
-      } else if (direction === "FortyFiveDown") {
+      } else if (trend === "falling_slowly") {
         trendValue = trendValue + (i * 0.4); // gentle fall
       }
       
@@ -339,6 +340,7 @@
   }
 </script>
 
+<!-- Rest of your CSS remains the same -->
 <style>
   /* Small grey divider for each departure item */
   .departure-divider {
